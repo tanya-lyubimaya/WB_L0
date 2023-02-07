@@ -10,9 +10,9 @@ run: build
 nats:
 	sudo docker container stop nats || true && \
     sudo docker container rm nats || true && \
-    sudo docker-compose -f build.yml up --detach && \
+    sudo docker-compose -f docker-compose.yml up --detach && \
     go install github.com/nats-io/natscli/nats@latest && \
     go run github.com/nats-io/natscli/nats@latest context add nats --server 127.0.0.1:4222 --description "nats server"
 
 pub:
-	./"pub to nats.sh"
+	./pub_to_nats.sh

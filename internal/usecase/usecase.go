@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-playground/validator/v10"
-	_ "github.com/go-playground/validator/v10"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	"github.com/tanya-lyubimaya/WB_L0/internal/domain"
@@ -32,7 +31,7 @@ func New(repoOrders domain.OrderRepository, logger *logrus.Entry) (*useCase, err
 	} else {
 		uc.logger.Errorln(err)
 	}
-	uc.natsConnection, err = nats.Connect(tools.ConfigInstance().NATSUrl)
+	uc.natsConnection, err = nats.Connect(tools.ConfigInstance().NATSUrl, nats.ReconnectBufSize(5*1024*1024))
 	if err != nil {
 		uc.logger.Errorln(err)
 		return nil, err
@@ -60,13 +59,17 @@ func (uc *useCase) subscription(m *nats.Msg) {
 
 	var validate *validator.Validate
 	validate = validator.New()
-	err = validate.Struct(m.Data)
+	err = validate.Struct(result)
 	if err != nil {
 		if _, ok := err.(*validator.InvalidValidationError); ok {
 			uc.logger.Errorln(err)
 			return
 		}
+		var hasErrors bool
 		for _, err := range err.(validator.ValidationErrors) {
+			if !hasErrors {
+				hasErrors = true
+			}
 			fmt.Println(err.Namespace())
 			fmt.Println(err.Field())
 			fmt.Println(err.StructNamespace())
@@ -79,7 +82,9 @@ func (uc *useCase) subscription(m *nats.Msg) {
 			fmt.Println(err.Param())
 			fmt.Println()
 		}
-		return
+		if hasErrors {
+			return
+		}
 	}
 	_, err = uc.repoOrder.Create(result)
 	if err != nil {
